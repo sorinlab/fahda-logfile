@@ -16,11 +16,14 @@ GetOptions("help|h" => sub { print HelpMessage(0) });
 my $Project_Dir     = $ARGV[0] or die "[FATAL]  Project directory must be specified\n";
 my $Output_Filename = $ARGV[1] or die "[FATAL]  Output filename must be specified\n";
 
+$Output_Filename = "${\getcwd()}/$Output_Filename";
+if (-e $Output_Filename) {
+    unlink $Output_Filename or die "[FATAL]  Cannot delete $Output_Filename: $!\n";
+}
+
 $Project_Dir =~ s/\/$//;    # Remove trailing slash if any
 my ($Project_Number) = $Project_Dir =~ m/(\d+$)/;
-
 my $Project_Path = "${\getcwd()}/$Project_Dir";
-$Output_Filename = "${\getcwd()}/$Output_Filename";
 generate_logfile($Project_Path, $Project_Number);
 
 sub generate_logfile {
