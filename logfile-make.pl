@@ -86,7 +86,7 @@ sub generate_all_frames_pdb {
     # `echo 1` to select the RNA (protein) group
     my $trjconv_cmd = "echo 1 | trjconv -s frame0.tpr -f $xtc_file -o $pdb_file  2> /dev/null";
     print STDOUT "Executing `$trjconv_cmd`\n";
-    `$trjconv_cmd`;
+    print STDOUT `$trjconv_cmd` . "\n";
 
     return $pdb_file;
 }
