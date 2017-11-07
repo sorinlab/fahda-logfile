@@ -16,11 +16,14 @@ GetOptions("help|h" => sub { print HelpMessage(0) });
 my $Project_Dir     = $ARGV[0] or die "[FATAL]  Project directory must be specified\n";
 my $Output_Filename = $ARGV[1] or die "[FATAL]  Output filename must be specified\n";
 
+$Output_Filename = "${\getcwd()}/$Output_Filename";
+if (-e $Output_Filename) {
+    unlink $Output_Filename or die "[FATAL]  Cannot delete $Output_Filename: $!\n";
+}
+
 $Project_Dir =~ s/\/$//;    # Remove trailing slash if any
 my ($Project_Number) = $Project_Dir =~ m/(\d+$)/;
-
 my $Project_Path = "${\getcwd()}/$Project_Dir";
-$Output_Filename = "${\getcwd()}/$Output_Filename";
 generate_logfile($Project_Path, $Project_Number);
 
 sub generate_logfile {
@@ -58,8 +61,10 @@ sub generate_logfile {
                 print STDOUT "[WARN]  Skipped--XTC file $xtc_file not found\n";
                 next;
             }
-            my $all_frames_pdb = generate_all_frames_pdb($xtc_file);
-            my $log_string = parse_all_frames_pdb($all_frames_pdb, $project_number, $run_number, $clone_number);
+
+            my $all_frames_pdb        = generate_all_frames_pdb($xtc_file);
+            my $timestamps_collection = parse_all_frames_pdb($all_frames_pdb);
+            my $log_string            = prepare_log_string($project_number, $run_number, $clone_number, $timestamps_collection);
 
             open(my $OUT, ">>", $Output_Filename) or die "[FATAL]  $Output_Filename: $!\n";
             print $OUT $log_string;
@@ -70,7 +75,6 @@ sub generate_logfile {
 
         chdir "..";
     }
-
 }
 
 sub generate_all_frames_pdb {
@@ -83,23 +87,41 @@ sub generate_all_frames_pdb {
     # `echo 1` to select the RNA (protein) group
     my $trjconv_cmd = "echo 1 | trjconv -s frame0.tpr -f $xtc_file -o $pdb_file  2> /dev/null";
     print STDOUT "Executing `$trjconv_cmd`\n";
-    `$trjconv_cmd`;
+    print STDOUT `$trjconv_cmd` . "\n";
 
     return $pdb_file;
 }
 
 sub parse_all_frames_pdb {
-    my ($all_frames_pdb, $project_number, $run_number, $clone_number) = @_;
+    my ($all_frames_pdb) = @_;
+    my %timestamps = ();
 
     open(my $ALL_FRAME_PDB, '<', $all_frames_pdb) or die "[FATAL]  $all_frames_pdb: $!\n";
-    my $log_string = "";
     while (my $line = <$ALL_FRAME_PDB>) {
         if ($line !~ m/^TITLE/) { next; }
-        chomp(my @values = split(/t=\s/, $line));
-        my $time_in_ps = int($values[1]);
-        $log_string .= sprintf("%4d    %3d    %3d    %6d\n", $project_number, $run_number, $clone_number, $time_in_ps);
+
+        chomp(my @fields = split(/t=\s/, $line));
+        my $timestamp = int($fields[1]);
+        if (not defined $timestamps{$timestamp}) {
+            $timestamps{$timestamp} = 1;
+        }
+        else {
+            $timestamps{$timestamp} += 1;
+        }
     }
     close($ALL_FRAME_PDB);
+
+    return \%timestamps;
+}
+
+sub prepare_log_string {
+    my ($project_number, $run_number, $clone_number, $timestamps_collection) = @_;
+    my $log_string = "";
+
+    foreach my $timestamp (sort { $a <=> $b } keys %{$timestamps_collection}) {
+        $log_string .= sprintf("%4d    %3d    %3d    %6d\n", $project_number, $run_number, $clone_number, $timestamp);
+    }
+
     return $log_string;
 }
 
