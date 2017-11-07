@@ -32,7 +32,7 @@ def read_logfile(logfile):
     logfile_handle = open(logfile, "r")
 
     for line in logfile_handle:
-        (project_number, run_number, clone_number, timestamp_in_ps) = line.split()
+        (project_number, run_number, clone_number, timestamp_in_ps) = line.split()[0:4]
         simulation_id = f"{project_number}:{run_number}:{clone_number}"
         if simulation_id not in logfile_data.keys() or logfile_data[simulation_id] is None:
             logfile_data[simulation_id] = [int(timestamp_in_ps)]
